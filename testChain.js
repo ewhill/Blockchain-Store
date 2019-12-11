@@ -6,11 +6,12 @@ const Constants = require('./lib/base/Constants');
 const sha2img = require('./lib/misc/sha2img');
 
 const CHAIN_STORAGE_MODES = {
+	NONE: -1,
 	FILE: 0,
 	MONGO: 1
 };
 
-const CHAIN_STORAGE_MODE = CHAIN_STORAGE_MODES.MONGO;
+const CHAIN_STORAGE_MODE = CHAIN_STORAGE_MODES.FILE;
 
 let Block;
 let Chain;
@@ -168,7 +169,7 @@ const main = async () => {
 	try { 
 		await testChain.load();
 	} catch(e) {
-		console.log(e.stack);
+		console.log(e.message);
 
 		console.log(chalk.rgb(255, 136, 0).bold(
 			"Error loading chain. A new chain will be created instead under " + 
@@ -195,7 +196,14 @@ const main = async () => {
 		await printChain(testChain);
 
 		// Commit our changes to storage
-		await testChain.commit();
+		try {
+			await testChain.commit();
+		} catch(e) {
+			console.log(chalk.rgb(255, 136, 0).bold(
+				`There was an error committing the changes to ` + 
+				`the chain!`));
+			console.error(e.message);
+		}
 
 		// Perform a rollback to the first block in the chain
 		await testChain.rollback(testChain._blocks[0]._hash);
@@ -207,7 +215,14 @@ const main = async () => {
 		await printChain(testChain);
 
 		// Commit our rollback to storage
-		await testChain.commit();
+		try {
+			await testChain.commit();
+		} catch(e) {
+			console.log(chalk.rgb(255, 136, 0).bold(
+				`There was an error committing the changes to ` + 
+				`the chain!`));
+			console.error(e.message);
+		}
 
 		// Close the blockchain
 		if(testChain.isClosable) {
