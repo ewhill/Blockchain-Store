@@ -1,8 +1,4 @@
-const CHAIN_STORAGE_MODES = {
-	FILE: 'file',
-	MONGO: 'mongo',
-	NONE: null
-};
+const { CHAIN_STORAGE_MODES } = require('./lib/base/Constants');
 
 module.exports = function(mode = CHAIN_STORAGE_MODES.NONE) {
 	let Block;

@@ -2,14 +2,8 @@ const chalk = require('chalk');
 const crypto = require('crypto');
 const util = require('util');
 
-const Constants = require('./lib/base/Constants');
+const { CHAIN_STORAGE_MODES, GENESIS_HASH } = require('./lib/base/Constants');
 const sha2img = require('./lib/misc/sha2img');
-
-const CHAIN_STORAGE_MODES = {
-	NONE: -1,
-	FILE: 0,
-	MONGO: 1
-};
 
 const CHAIN_STORAGE_MODE = CHAIN_STORAGE_MODES.FILE;
 
@@ -48,7 +42,7 @@ const createTransactions = () => {
 const addBlocks = async(chain) => {
 	let nBlocksToAdd = parseInt(Math.floor((Math.random()*10))) + 1; // [1-10]
 	let previousHash = chain.blocks && chain.blocks.length > 0 ? 
-		chain.blocks.slice(-1)[0].hash : Constants.GENESIS_HASH;
+		chain.blocks.slice(-1)[0].hash : GENESIS_HASH;
 
 	for(let i=0; i<nBlocksToAdd; i++) {
 		let b;
@@ -200,9 +194,23 @@ const main = async () => {
 			await testChain.commit();
 		} catch(e) {
 			console.log(chalk.rgb(255, 136, 0).bold(
-				`There was an error committing the changes to ` + 
-				`the chain!`));
+				`There was an error committing the changes to the chain!`));
 			console.error(e.message);
+		}
+
+		let indicesCorrect = true;
+		for(let i=0; i<testChain.blocks.length; i++) {
+			if(testChain.indices[testChain.blocks[i].hash] !== i) {
+				indicesCorrect = false;
+				console.log(chalk.rgb(255, 136, 0).bold(
+					`The chain contains invalid index for ` + 
+					`block ${testChain.blocks[i].hash}!`));
+			}
+		}
+
+		if(indicesCorrect) {
+			console.log(chalk.rgb(0, 255, 0).bold(
+				`The chain has valid indices.`));
 		}
 
 		// Perform a rollback to the first block in the chain
@@ -219,8 +227,7 @@ const main = async () => {
 			await testChain.commit();
 		} catch(e) {
 			console.log(chalk.rgb(255, 136, 0).bold(
-				`There was an error committing the changes to ` + 
-				`the chain!`));
+				`There was an error committing the changes to the chain!`));
 			console.error(e.message);
 		}
 
