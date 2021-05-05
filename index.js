@@ -1,6 +1,6 @@
-const { CHAIN_STORAGE_MODES } = require('./lib/base/Constants');
+const Constants = require('./lib/base/Constants');
 
-module.exports = function(mode = CHAIN_STORAGE_MODES.NONE) {
+module.exports = function(mode = Constants.CHAIN_STORAGE_MODES.NONE) {
 	let Block;
 	let Chain;
 
@@ -18,5 +18,5 @@ module.exports = function(mode = CHAIN_STORAGE_MODES.NONE) {
 			Chain = require('./lib/base/Chain.js');
 	}
 
-	return { Chain, Block };
+	return { Chain, Block, Constants };
 }
