@@ -5,11 +5,11 @@ module.exports = function(mode = Constants.CHAIN_STORAGE_MODES.NONE) {
 	let Chain;
 
 	switch(mode) {
-		case CHAIN_STORAGE_MODES.FILE:
+		case Constants.CHAIN_STORAGE_MODES.FILE:
 			Block = require('./lib/file/Block');
 			Chain = require('./lib/file/Chain');
 			break;
-		case CHAIN_STORAGE_MODES.MONGO:
+		case Constants.CHAIN_STORAGE_MODES.MONGO:
 			Block = require('./lib/mongo/Block');
 			Chain = require('./lib/mongo/Chain');
 			break;

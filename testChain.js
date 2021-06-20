@@ -4,8 +4,9 @@ const util = require('util');
 
 const { CHAIN_STORAGE_MODES, GENESIS_HASH } = require('./lib/base/Constants');
 const sha2img = require('./lib/misc/sha2img');
+const Database = require('./lib/mongo/Database');
 
-const CHAIN_STORAGE_MODE = CHAIN_STORAGE_MODES.FILE;
+const CHAIN_STORAGE_MODE = CHAIN_STORAGE_MODES.MONGO;
 
 let Block;
 let Chain;
@@ -26,7 +27,7 @@ switch(CHAIN_STORAGE_MODE) {
 
 const createTransactions = () => {
 	let transactions = [];
-	let nTransactionsToAdd = parseInt(Math.floor((Math.random()*20))) + 1;
+	let nTransactionsToAdd = parseInt(Math.floor((Math.random()*10))) + 1;
 
 	for(let i=0; i<nTransactionsToAdd; i++) {
 		transactions.push([{
@@ -40,95 +41,89 @@ const createTransactions = () => {
 };
 
 const addBlocks = async(chain) => {
-	let nBlocksToAdd = parseInt(Math.floor((Math.random()*10))) + 1; // [1-10]
-	let previousHash = chain.blocks && chain.blocks.length > 0 ? 
-		chain.blocks.slice(-1)[0].hash : GENESIS_HASH;
+	let previousHash = GENESIS_HASH;
+	if(chain.height > 0) {
+		const previousBlock = await chain.get({ index: chain.height-1 });
+		previousHash = previousBlock.hash;
+	}
 
+	let nBlocksToAdd = parseInt(Math.floor((Math.random()*3))) + 1; // [1-3]
 	for(let i=0; i<nBlocksToAdd; i++) {
-		let b;
-
-		switch(CHAIN_STORAGE_MODE) {
-			case CHAIN_STORAGE_MODES.MONGO:
-				b = new Block({ 
-					previous: previousHash,
-					name: chain._database.name
-				});
-				break;
-			case CHAIN_STORAGE_MODES.FILE:
-			default:
-				b = new Block({ previous: previousHash });
-		}
-
-		b.data = createTransactions();
+		const block = new Block({
+			previous: previousHash,
+			data: createTransactions()
+		});
 
 		try {
-			await chain.add(b);
+			await chain.add(block);
 		} catch(e) {
-			console.warn(e.message);
+			console.warn(e.stack);
 		}
 
-		previousHash = b.hash;
+		previousHash = block.hash;
 	}
 };
 
 const printChain = async (chain) => {
 	let isValid = await chain.verify(false);
 
-	let name = 'Chain';
+	console.log(
+		`\n${isValid ? chalk.green('✓') : chalk.red('✗')} ` +
+		chalk.underline.bold(`${chain.name} (${chain.height} blocks)`)
+	);
+
+	const printOp = async (b) => {
+			if(!(b instanceof Block)) {
+				b = new Block({ ...b });
+			}
+			const isValidBlock = b.verify(false);
+			const hash = b.hash;
+			console.log(`↳ ${hash} ` + 
+				`${isValidBlock ? chalk.green('✓') : chalk.red('✗')}`);
+			return b;
+		};
 
 	switch(CHAIN_STORAGE_MODE) {
 		case CHAIN_STORAGE_MODES.MONGO:
-			name = chain._database.name;
-			break;
 		case CHAIN_STORAGE_MODES.FILE:
-			name = chain._directory;
+			await chain.walk({ operation: printOp });
 			break;
-	}
-
-	console.log(
-		`\n${isValid ? chalk.green('✓') : chalk.red('✗')} ` +
-		chalk.underline.bold(`${name} (${chain.blocks.length} blocks)`)
-	);
-
-	for(let b of chain.blocks) {
-		console.log(`↳ ${b.hash} ` + 
-			`${b.verify(false) ? chalk.green('✓') : chalk.red('✗')}`);
+		default:
+			for(let b of chain.blocks) {
+				await printOp(b);
+			}
+			break;
 	}
 
 	console.log("");
 };
 
 const performAndPrintDiff = async (orig, test) => {
-	let diff = await orig.diff(test);
-	let first = true;
-	let i = 0;
+	let diff;
+	if (orig.height > test.height) {
+		diff = await orig.diff(test);
+	} else {
+		diff = await test.diff(orig);
+	}
 
+	let i = 0;
 	while(diff[i] === null && i<diff.length) i++;
 
 	console.log(
 		`\n\n${i} preceeding blocks are the same.\n\n`
-			.replace(/^(.*)$/gm, function(line) {
-					return chalk.bgGreen('\t') + ' ' + line;
-				})
-	);
+			.replace(/^(.*)$/gm, (l) => `${chalk.bgGreen('\t')} ${l}`));
 
 	while(diff[i] !== null && i<diff.length) {
 		console.log(
 			util.inspect(diff[i], {colors: true, depth: null})
-				.replace(/^(.*)$/gm, function(line) {
-					return chalk.bgRed('\t') + ' ' + line;
-				})
-		);
+				.replace(/^(.*)$/gm, (l) => `${chalk.bgRed('\t')} ${l}`));
 		i++;
 	}
 
 	if(i < diff.length) {
 		console.log(
-			`\n\n${diff.length - i} preceeding blocks are the same.\n\n`
-				.replace(/^(.*)$/gm, function(line) {
-						return chalk.bgGreen('\t') + ' ' + line;
-					})
-		);
+			`\n\n${diff.length - i} succeeding blocks are the same.\n\n`
+				.replace(/^(.*)$/gm, (l) => `${chalk.bgGreen('\t')} ${l}`));
 	}
 };
 
@@ -148,8 +143,14 @@ const main = async () => {
 	switch(CHAIN_STORAGE_MODE) {
 		case CHAIN_STORAGE_MODES.MONGO:
 			// For mongo-based blockchain:
-			testChain = new Chain({ name: `testChain`, 
-									autocommitTimeoutMs: 1000 });
+			const db = new Database({
+					host: 'localhost',
+					name: 'testChain',
+				});
+			testChain = new Chain({
+					database: db,
+					autocommitTimeoutMs: 1000
+				});
 			break;
 		case CHAIN_STORAGE_MODES.FILE:
 			// For file-based blockchain:
@@ -160,7 +161,7 @@ const main = async () => {
 			testChain = new Chain();
 	}
 
-	try { 
+	try {
 		await testChain.load();
 	} catch(e) {
 		console.log(e.message);
@@ -175,7 +176,7 @@ const main = async () => {
 
 	try {
 		// Keep a copy of the orignal, unaltered chain
-		let originalChain = testChain.clone();
+		let originalChain = await testChain.clone();
 
 		// Check if the clone succeeded
 		let cloneIsEqual = await testChain.equals(originalChain);
@@ -185,8 +186,7 @@ const main = async () => {
 		// Make some changes
 		await addBlocks(testChain);
 
-		// Show the additions (diff versus original, and the full chain hashes)
-		await performAndPrintDiff(originalChain, testChain);
+		// Print the cloned chain with additions
 		await printChain(testChain);
 
 		// Commit our changes to storage
@@ -198,43 +198,21 @@ const main = async () => {
 			console.error(e.message);
 		}
 
-		let indicesCorrect = true;
-		for(let i=0; i<testChain.blocks.length; i++) {
-			if(testChain.indices[testChain.blocks[i].hash] !== i) {
-				indicesCorrect = false;
-				console.log(chalk.rgb(255, 136, 0).bold(
-					`The chain contains invalid index for ` + 
-					`block ${testChain.blocks[i].hash}!`));
-			}
-		}
-
-		if(indicesCorrect) {
-			console.log(chalk.rgb(0, 255, 0).bold(
-				`The chain has valid indices.`));
-		}
-
-		// Perform a rollback to the first block in the chain
-		await testChain.rollback(testChain._blocks[0]._hash);
-
 		// Show the graphic generated from the chain's first block's hash
-		printHashGraphic(testChain._blocks[0]._hash);
+		const lastBlock = await testChain.get({ index: testChain.height-1 });
+		printHashGraphic(lastBlock.hash);
 
-		// Show the rollback
-		await printChain(testChain);
-
-		// Commit our rollback to storage
-		try {
-			await testChain.commit();
-		} catch(e) {
-			console.log(chalk.rgb(255, 136, 0).bold(
-				`There was an error committing the changes to the chain!`));
-			console.error(e.message);
-		}
+		// Show the additions (diff from original)
+		await performAndPrintDiff(originalChain, testChain);
 
 		// Close the blockchain
 		if(testChain.isClosable) {
-			console.log("Closing Chain...");
 			await testChain.close();
+		}
+
+		// Close the blockchain
+		if(originalChain.isClosable) {
+			await originalChain.close();
 		}
 	} catch(e) {
 		console.log(e.stack);
