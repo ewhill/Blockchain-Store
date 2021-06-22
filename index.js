@@ -1,4 +1,5 @@
 const Constants = require('./lib/base/Constants');
+const Database = require('./lib/mongo/Database');
 
 module.exports = function(mode = Constants.CHAIN_STORAGE_MODES.NONE) {
 	let Block;
@@ -18,5 +19,5 @@ module.exports = function(mode = Constants.CHAIN_STORAGE_MODES.NONE) {
 			Chain = require('./lib/base/Chain.js');
 	}
 
-	return { Chain, Block, Constants };
+	return { Block, Chain, Constants, Database };
 }
