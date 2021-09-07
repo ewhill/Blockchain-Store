@@ -6,7 +6,7 @@ const { CHAIN_STORAGE_MODES, GENESIS_HASH } = require('./lib/base/Constants');
 const sha2img = require('./lib/misc/sha2img');
 const Database = require('./lib/mongo/Database');
 
-const CHAIN_STORAGE_MODE = CHAIN_STORAGE_MODES.MONGO;
+const CHAIN_STORAGE_MODE = CHAIN_STORAGE_MODES.NONE;
 
 let Block;
 let Chain;
