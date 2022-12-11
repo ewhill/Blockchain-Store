@@ -6,12 +6,32 @@ const { CHAIN_STORAGE_MODES, GENESIS_HASH } = require('./lib/base/Constants');
 const sha2img = require('./lib/misc/sha2img');
 const Database = require('./lib/mongo/Database');
 
-const CHAIN_STORAGE_MODE = CHAIN_STORAGE_MODES.NONE;
+const FLAG_CHAIN_STORAGE_MODE = 
+	process.argv[2]
+		.toString()
+		.trim()
+		.replace(/^\-{1,2}chain_storage_mode=(.*)/ig, "$1")
+		.toLowerCase();
 
+let chainStorageMode;
 let Block;
 let Chain;
 
-switch(CHAIN_STORAGE_MODE) {
+console.log(`Using '${FLAG_CHAIN_STORAGE_MODE}' mode for chain.`);
+
+switch(FLAG_CHAIN_STORAGE_MODE) {
+	case 'file':
+		chainStorageMode = CHAIN_STORAGE_MODES.FILE;
+		break;
+	case 'mongo':
+		chainStorageMode = CHAIN_STORAGE_MODES.MONGO;
+		break;
+	default:
+		chainStorageMode = CHAIN_STORAGE_MODES.NONE;
+		break;
+}
+
+switch(chainStorageMode) {
 	case CHAIN_STORAGE_MODES.FILE:
 		Block = require('./lib/file/Block');
 		Chain = require('./lib/file/Chain');
@@ -83,7 +103,7 @@ const printChain = async (chain) => {
 			return b;
 		};
 
-	switch(CHAIN_STORAGE_MODE) {
+	switch(chainStorageMode) {
 		case CHAIN_STORAGE_MODES.MONGO:
 		case CHAIN_STORAGE_MODES.FILE:
 			await chain.walk({ operation: printOp });
@@ -140,7 +160,7 @@ const printHashGraphic = (hash) => {
 const main = async () => {
 	let testChain;
 
-	switch(CHAIN_STORAGE_MODE) {
+	switch(chainStorageMode) {
 		case CHAIN_STORAGE_MODES.MONGO:
 			// For mongo-based blockchain:
 			const db = new Database({
